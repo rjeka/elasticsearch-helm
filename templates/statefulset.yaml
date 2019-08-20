@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "elasticsearch.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "elasticsearch.name" . }}
+    helm.sh/chart: {{ include "elasticsearch.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "elasticsearch.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "elasticsearch.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          - name: discovery.type
+            value: single-node
+          - name: ES_JAVA_OPTS
+            value: "-Djava.net.preferIPv4Stack=true -Xms{{ .Values.master.heapSize }} -Xmx{{ .Values.master.heapSize }}"
+          resources:
+            requests:
+              memory: "2Mi"
+              cpu: "500m"
+            limits:
+              memory: "8Gi"
+              cpu: "2"
+          volumeMounts:
+          - mountPath: /usr/share/elasticsearch/data
+            name: data
+          ports:
+            - name: http
+              containerPort: 9200
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.storageClass }}
+      resources:
+        requests:
+          storage: {{ .Values.claimSize }}
